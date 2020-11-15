@@ -280,17 +280,17 @@ def load_xml(filename):
     pairs = []
     tree = ET.parse(filename)
     root = tree.getroot()
-    
+
     for xml_pair in root.iter('pair'):
         t = xml_pair.find('t').text
         h = xml_pair.find('h').text
         attribs = dict(xml_pair.items())
-        
+
         # the entailment relation is expressed differently in some versions
         if 'entailment' in attribs:
             ent_string = attribs['entailment'].lower()
             entailment = map_entailment_string(ent_string)
-                        
+
         elif 'value' in attribs:
             if attribs['value'].lower() == 'true':
                 entailment = ds.Entailment.entailment
@@ -299,7 +299,7 @@ def load_xml(filename):
 
         pair = ds.Pair(t, h, None, entailment)
         pairs.append(pair)
-    
+
     return pairs
 
 
@@ -312,17 +312,17 @@ def write_rte_file(filename, pairs, **attribs):
     root = ET.Element('entailment-corpus')
     for i, pair in enumerate(pairs, 1):
         xml_attribs = {'id':str(i)}
-        
+
         # add any other attributes supplied in the function call or the pair
         xml_attribs.update(attribs)
         xml_attribs.update(pair.attribs)
-        
+
         xml_pair = ET.SubElement(root, 'pair', xml_attribs)
         xml_t = ET.SubElement(xml_pair, 't', pair.t_attribs)
         xml_h = ET.SubElement(xml_pair, 'h', pair.h_attribs)
         xml_t.text = pair.t.strip()
         xml_h.text = pair.h.strip()
-        
+
     # produz XML com formatação legível (pretty print)
     xml_string = ET.tostring(root, 'utf-8')
     reparsed = minidom.parseString(xml_string)
@@ -336,7 +336,7 @@ def train_classifier(x, y):
     """
     classifier = config.classifier_class(class_weight='auto')
     classifier.fit(x, y)
-    
+
     return classifier
 
 
@@ -346,7 +346,7 @@ def train_regressor(x, y):
     """
     regressor = config.regressor_class()
     regressor.fit(x, y)
-    
+
     return regressor
 
 
@@ -486,9 +486,19 @@ def load_embeddings(path_or_paths, normalize=True,
     if not isinstance(path_or_paths, (list, tuple)):
         path_or_paths = [path_or_paths]
 
+    # Corrige problema de allow_pickle==False como valor default,
+    # para versões superiores a numpy==1.16.1
+    if np.__version__ != '1.16.1' and float(np.__version__) > 1.16:  
+        np_load_old = np.load
+        np.load = lambda *a, **k: np_load_old(*a, allow_pickle=True, **k)
+
     arrays = []
     for path in path_or_paths:
         arrays.append(np.load(path))
+
+    # Restaura (unshadow) a função np.load
+    if np.__version__ != '1.16.1' and float(np.__version__) > 1.16:  
+        np.load = np_load_old
 
     if add_vectors:
         mean = arrays[0].mean()
